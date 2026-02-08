@@ -24,7 +24,13 @@ const registerUser = async (req, res, next) => {
             throw new AppError(400, "Avatar file is required");
         }
 
-        const avatar = avatarLocalPath;
+        let avatar = avatarLocalPath.replace(/\\/g, "/");
+        if (avatar.startsWith("public/")) {
+            avatar = avatar.replace("public/", "");
+        }
+        if (!avatar.startsWith("/")) {
+            avatar = "/" + avatar;
+        }
 
         const user = await User.create({
             fullName,
@@ -74,8 +80,6 @@ const loginUser = async (req, res, next) => {
 
         const loggedInUser = await User.findById(user._id).select("-password");
 
-
-
         return res
             .status(200)
             .json(
@@ -103,7 +107,14 @@ const updateAccountDetails = async (req, res, next) => {
         if (username) updateData.username = username;
 
         if (req.file) {
-            updateData.avatar = req.file.path;
+            let avatarPath = req.file.path.replace(/\\/g, "/");
+            if (avatarPath.startsWith("public/")) {
+                avatarPath = avatarPath.replace("public/", "");
+            }
+            if (!avatarPath.startsWith("/")) {
+                avatarPath = "/" + avatarPath;
+            }
+            updateData.avatar = avatarPath;
         }
 
         const user = await User.findByIdAndUpdate(
@@ -123,4 +134,15 @@ const updateAccountDetails = async (req, res, next) => {
     }
 };
 
-export { registerUser, loginUser, updateAccountDetails };
+const getCurrentUser = async (req, res, next) => {
+    try {
+        const user = await User.findById(req.user._id).select("-password");
+        return res
+            .status(200)
+            .json(new ApiResponse(200, user, "User fetched successfully"));
+    } catch (error) {
+        next(error);
+    }
+};
+
+export { registerUser, loginUser, updateAccountDetails, getCurrentUser };

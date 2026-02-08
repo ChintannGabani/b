@@ -1,5 +1,10 @@
 import { Router } from "express";
-import { registerUser, loginUser, updateAccountDetails } from "../controllers/user.controller.js";
+import {
+    loginUser,
+    registerUser,
+    updateAccountDetails,
+    getCurrentUser
+} from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { validate } from "../validators/validate.js";
@@ -28,5 +33,6 @@ router.route("/update-account").patch(
     validate(userUpdateSchema),
     updateAccountDetails
 );
+router.route("/current-user").get(verifyJWT, getCurrentUser);
 
 export default router;

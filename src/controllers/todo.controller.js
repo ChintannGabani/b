@@ -5,18 +5,23 @@ import mongoose from "mongoose";
 
 const createTodo = async (req, res, next) => {
     try {
-        const { content, categoryId } = req.body;
+        const { content, categoryId, description, priority, dueDate } = req.body;
 
         if (!content || !categoryId) {
             throw new AppError(400, "Content and Category ID are required");
         }
 
-        const todo = await Todo.create({
+        let todo = await Todo.create({
             content,
+            description,
+            priority,
+            dueDate,
             category: categoryId,
             createdBy: req.user._id,
             isComplete: false
         });
+
+        todo = await todo.populate('category', 'name');
 
         return res
             .status(201)
@@ -28,11 +33,27 @@ const createTodo = async (req, res, next) => {
 
 const getAllTodos = async (req, res, next) => {
     try {
+        const { search, priority, isComplete } = req.query;
+
+        const matchStage = {
+            createdBy: new mongoose.Types.ObjectId(req.user._id)
+        };
+
+        if (search) {
+            matchStage.content = { $regex: search, $options: "i" };
+        }
+
+        if (priority && priority !== 'all') {
+            matchStage.priority = priority;
+        }
+
+        if (isComplete !== undefined && isComplete !== 'all') {
+            matchStage.isComplete = isComplete === 'true';
+        }
+
         const todos = await Todo.aggregate([
             {
-                $match: {
-                    createdBy: new mongoose.Types.ObjectId(req.user._id)
-                }
+                $match: matchStage
             },
             {
                 $lookup: {
@@ -60,7 +81,8 @@ const getAllTodos = async (req, res, next) => {
                 $project: {
                     categoryDetails: 0
                 }
-            }
+            },
+            { $sort: { createdAt: -1 } }
         ]);
 
         return res
@@ -74,11 +96,14 @@ const getAllTodos = async (req, res, next) => {
 const updateTodo = async (req, res, next) => {
     try {
         const { todoId } = req.params;
-        const { content, isComplete } = req.body;
+        const { content, isComplete, description, priority, dueDate } = req.body;
 
         const updateData = {};
         if (content !== undefined) updateData.content = content;
         if (isComplete !== undefined) updateData.isComplete = isComplete;
+        if (description !== undefined) updateData.description = description;
+        if (priority !== undefined) updateData.priority = priority;
+        if (dueDate !== undefined) updateData.dueDate = dueDate;
 
         const todo = await Todo.findOneAndUpdate(
             {
@@ -89,7 +114,7 @@ const updateTodo = async (req, res, next) => {
                 $set: updateData
             },
             { new: true }
-        );
+        ).populate('category', 'name');
 
         if (!todo) {
             throw new AppError(404, "Todo not found or unauthorized");
